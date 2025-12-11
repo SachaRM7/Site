@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket Psychologie Islamique 3D + IA</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Three.js pour la 3D -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Anton&display=swap');
+
+        body {
+            margin: 0;
+            overflow: hidden; /* Empêche le scroll pour l'immersion 3D */
+            font-family: 'Courier Prime', monospace;
+            background-color: #1a1a1a; /* Fond sombre pour faire ressortir la 3D */
+        }
+
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+            pointer-events: none; /* Laisse passer les clics vers le ticket */
+        }
+
+        /* Conteneur 3D pour l'effet de tilt */
+        #scene-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            perspective: 1000px; /* Profondeur de la scène */
+            position: relative;
+            z-index: 10;
+            padding: 20px;
+            overflow-y: auto; /* Permet le scroll du contenu si l'écran est petit */
+        }
+
+        .ticket {
+            background-color: #fffdf5;
+            width: 100%;
+            max-width: 420px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+            position: relative;
+            padding: 0 0 20px 0;
+            color: #2d2d2d;
+            border-left: 1px solid #e0e0e0;
+            border-right: 1px solid #e0e0e0;
+            
+            /* Propriétés pour l'animation 3D */
+            transform-style: preserve-3d;
+            transition: transform 0.1s ease-out;
+            will-change: transform;
+        }
+
+        /* Effet Papier Déchiré (Haut et Bas) */
+        .ticket::before, .ticket::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            width: 100%;
+            height: 16px;
+            background-size: 20px 20px;
+            background-repeat: repeat-x;
+        }
+
+        .ticket::before {
+            top: -16px;
+            background-image: radial-gradient(circle at 10px 16px, transparent 8px, #fffdf5 9px);
+        }
+
+        .ticket::after {
+            bottom: -16px;
+            background-image: radial-gradient(circle at 10px -6px, transparent 8px, #fffdf5 9px);
+            filter: drop-shadow(0 5px 3px rgba(0,0,0,0.3));
+        }
+
+        /* Styles Typo */
+        h1, h2, h3 {
+            font-family: 'Anton', sans-serif;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .dotted-line {
+            border-bottom: 2px dashed #a0a0a0;
+            margin: 20px 0;
+            width: 100%;
+        }
+
+        .double-line {
+            border-bottom: 4px double #2d2d2d;
+            margin: 15px 0;
+        }
+
+        .highlight-box {
+            border: 2px solid #2d2d2d;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f4f1ea;
+            /* Petit effet de relief interne */
+            box-shadow: inset 0 0 5px rgba(0,0,0,0.05);
+        }
+
+        .icon-circle {
+            width: 35px;
+            height: 35px;
+            background: #2d2d2d;
+            color: #fffdf5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            margin-right: 10px;
+            flex-shrink: 0;
+        }
+
+        .barcode {
+            font-family: 'Libre Barcode 39', cursive;
+            height: 40px;
+            background: repeating-linear-gradient(
+                90deg,
+                #000,
+                #000 2px,
+                #fff 2px,
+                #fff 4px
+            );
+            width: 80%;
+            margin: 0 auto;
+        }
+
+        .text-blue { color: #1e3a8a; } 
+
+        /* Styles pour la section IA */
+        textarea {
+            width: 100%;
+            background: transparent;
+            border: 1px dashed #2d2d2d;
+            font-family: 'Courier Prime', monospace;
+            font-size: 0.8rem;
+            padding: 8px;
+            resize: none;
+            outline: none;
+            margin-bottom: 10px;
+        }
+        
+        textarea:focus {
+            background-color: rgba(0,0,0,0.02);
+            border-style: solid;
+        }
+
+        .btn-magic {
+            width: 100%;
+            background-color: #2d2d2d;
+            color: white;
+            font-family: 'Courier Prime', monospace;
+            padding: 8px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+        }
+
+        .btn-magic:hover {
+            background-color: #1e3a8a;
+        }
+        
+        .btn-magic:disabled {
+            background-color: #a0a0a0;
+            cursor: not-allowed;
+        }
+
+        #ai-response {
+            font-size: 0.85rem;
+            line-height: 1.4;
+            white-space: pre-wrap;
+            border-left: 2px solid #2d2d2d;
+            padding-left: 10px;
+            margin-top: 15px;
+            display: none; /* Hidden by default */
+        }
+        
+        .typing-cursor::after {
+            content: '▋';
+            animation: blink 1s infinite;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Canvas Three.js pour l'arrière-plan -->
+    <div id="canvas-container"></div>
+
+    <!-- Wrapper pour centrer et gérer la perspective -->
+    <div id="scene-wrapper">
+        <div class="ticket p-6" id="ticket">
+            
+            <!-- HEADER -->
+            <div class="text-center mb-4">
+                <i class="fas fa-brain text-4xl mb-2 text-gray-800"></i>
+                <h1 class="text-3xl leading-none mb-1">PSYCHO & ISLAM</h1>
+                <p class="text-sm font-bold">VULGARISATION DU SAVOIR</p>
+                <p class="text-xs text-gray-500">DATE: AUJOURD'HUI | HEURE: MAINTENANT</p>
+            </div>
+
+            <div class="double-line"></div>
+
+            <!-- SECTION 1: HIÉRARCHIE -->
+            <div class="mb-4">
+                <h2 class="text-lg mb-2 text-blue-900"><i class="fas fa-layer-group mr-2"></i>HIERARCHIE SAVOIR</h2>
+                <div class="flex justify-between items-center text-sm mb-2">
+                    <span>Science Moderne</span>
+                    <span class="font-bold">2D (Relative)</span>
+                </div>
+                <div class="flex justify-between items-center text-sm">
+                    <span>Révélation</span>
+                    <span class="font-bold bg-gray-800 text-white px-1">3D (Absolue)</span>
+                </div>
+                <p class="text-xs mt-2 italic text-gray-600">"La science n'est pas la vérité absolue, c'est une photo à un instant T."</p>
+            </div>
+
+            <div class="dotted-line"></div>
+
+            <!-- SECTION 2: L'ÉQUIPE (TRIPARTITION) -->
+            <div class="mb-4">
+                <h2 class="text-lg mb-3 text-blue-900"><i class="fas fa-users mr-2"></i>LA STRUCTURE (L'ÊTRE)</h2>
+                
+                <!-- Item 1 -->
+                <div class="flex items-start mb-3">
+                    <div class="icon-circle"><i class="fas fa-crown"></i></div>
+                    <div>
+                        <h3 class="text-base font-bold">QALB (Le Cœur)</h3>
+                        <p class="text-xs leading-tight">Le Roi. Le centre de la foi. Doit commander.</p>
+                    </div>
+                </div>
+
+                <!-- Item 2 -->
+                <div class="flex items-start mb-3">
+                    <div class="icon-circle"><i class="fas fa-horse-head"></i></div>
+                    <div>
+                        <h3 class="text-base font-bold">NAFS (L'Âme/Ego)</h3>
+                        <p class="text-xs leading-tight">La Monture. Siège des désirs. Doit être domptée.</p>
+                    </div>
+                </div>
+
+                <!-- Item 3 -->
+                <div class="flex items-start">
+                    <div class="icon-circle"><i class="fas fa-user-astronaut"></i></div>
+                    <div>
+                        <h3 class="text-base font-bold">RUH (L'Esprit)</h3>
+                        <p class="text-xs leading-tight">Le Cavalier. Souffle divin. Tire vers le haut.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="highlight-box text-center">
+                <p class="text-xs font-bold uppercase">Objectif :</p>
+                <p class="text-sm">Le Cavalier doit diriger la Monture pour sauver le Roi.</p>
+            </div>
+
+            <div class="dotted-line"></div>
+
+            <!-- SECTION 3: POLITIQUE INTÉRIEURE -->
+            <div class="mb-4">
+                <h2 class="text-lg mb-2 text-blue-900"><i class="fas fa-chess-rook mr-2"></i>GÉRER LE ROYAUME</h2>
+                <p class="text-xs mb-3 text-gray-500">(Analogie Imam Al-Ghazali)</p>
+                
+                <ul class="text-sm space-y-1 pl-1">
+                    <li class="flex justify-between">
+                        <span><i class="fas fa-city w-5 text-gray-400"></i> CORPS</span>
+                        <span>= LA CITÉ</span>
+                    </li>
+                    <li class="flex justify-between font-bold text-green-700">
+                        <span><i class="fas fa-scroll w-5"></i> INTELLECT</span>
+                        <span>= LE VIZIR (Sage)</span>
+                    </li>
+                    <li class="flex justify-between text-red-600">
+                        <span><i class="fas fa-mask w-5"></i> DÉSIR</span>
+                        <span>= GOUVERNEUR (Menteur)</span>
+                    </li>
+                    <li class="flex justify-between text-red-600">
+                        <span><i class="fas fa-fire w-5"></i> COLÈRE</span>
+                        <span>= POLICE (Destructive)</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div class="dotted-line"></div>
+
+            <!-- SECTION 4: DIAGNOSTIC & REMÈDE -->
+            <div class="mb-4">
+                <h2 class="text-lg mb-2 text-blue-900"><i class="fas fa-heartbeat mr-2"></i>BILAN SANTÉ</h2>
+                
+                <div class="mb-3">
+                    <h4 class="font-bold text-sm">ANXIÉTÉ (Halu'a)</h4>
+                    <p class="text-xs">Ce n'est pas une maladie, c'est un <span class="bg-yellow-200 px-1">SIGNAL</span>.</p>
+                </div>
+
+                <div class="mb-3">
+                    <h4 class="font-bold text-sm">ORDONNANCE (Sourate 70)</h4>
+                    <div class="flex justify-between text-xs mt-1">
+                        <span>1. Prière (Lien vertical)</span>
+                        <i class="fas fa-check-square"></i>
+                    </div>
+                    <div class="flex justify-between text-xs mt-1">
+                        <span>2. Charité (Lien horizontal)</span>
+                        <i class="fas fa-check-square"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dotted-line"></div>
+
+            <!-- NEW SECTION: IA GEMINI -->
+            <div class="mb-4">
+                <h2 class="text-lg mb-2 text-blue-900"><i class="fas fa-magic mr-2"></i>LE CONSEILLER ✨</h2>
+                <p class="text-xs mb-2">Décris ton état actuel (colère, doute, fatigue...) pour une analyse immédiate :</p>
+                
+                <textarea id="user-input" rows="3" placeholder="Ex: Je me sens submergé par le travail et je m'énerve vite..."></textarea>
+                
+                <button onclick="consultOracle()" class="btn-magic" id="consult-btn">
+                    IMPRIMER L'ANALYSE <i class="fas fa-print"></i>
+                </button>
+
+                <div id="ai-response" class="text-xs"></div>
+            </div>
+
+            <div class="double-line"></div>
+
+            <!-- FOOTER / TOTAL -->
+            <div class="mt-4">
+                <div class="flex justify-between items-end mb-2">
+                    <span class="text-xl font-bold">COÛT TOTAL</span>
+                    <span class="text-2xl font-bold">EFFORT</span>
+                </div>
+                <div class="flex justify-between text-xs text-gray-500 mb-6">
+                    <span>(Mujahada)</span>
+                    <span>Prix à payer</span>
+                </div>
+
+                <div class="text-center">
+                    <p class="text-sm font-bold mb-2">MERCI DE VOTRE ATTENTION</p>
+                    <div class="barcode mb-2"></div>
+                    <p class="text-[10px] uppercase">Ticket à conserver dans le cœur</p>
+                    <p class="text-[10px]">#PsychologieIslamique #GeminiPowered</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. CONFIGURATION THREE.JS (ARRIÈRE-PLAN 3D) ---
+        const scene = new THREE.Scene();
+        scene.fog = new THREE.FogExp2(0x1a1a1a, 0.002);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        // Objets 3D
+        const geometrySpirit = new THREE.IcosahedronGeometry(1.5, 0);
+        const materialSpirit = new THREE.MeshBasicMaterial({ color: 0x4fc3f7, wireframe: true, transparent: true, opacity: 0.3 });
+        const spirit = new THREE.Mesh(geometrySpirit, materialSpirit);
+        spirit.position.set(4, 2, -5);
+        scene.add(spirit);
+
+        const geometrySoul = new THREE.TorusKnotGeometry(1, 0.3, 100, 16);
+        const materialSoul = new THREE.MeshBasicMaterial({ color: 0xffab91, wireframe: true, transparent: true, opacity: 0.3 });
+        const soul = new THREE.Mesh(geometrySoul, materialSoul);
+        soul.position.set(-4, -2, -5);
+        scene.add(soul);
+
+        const geometryHeart = new THREE.OctahedronGeometry(1);
+        const materialHeart = new THREE.MeshBasicMaterial({ color: 0xffffff, wireframe: true, transparent: true, opacity: 0.2 });
+        const heart = new THREE.Mesh(geometryHeart, materialHeart);
+        heart.position.set(0, 0, -8);
+        scene.add(heart);
+
+        const particlesGeometry = new THREE.BufferGeometry();
+        const particlesCount = 500;
+        const posArray = new Float32Array(particlesCount * 3);
+        for(let i = 0; i < particlesCount * 3; i++) posArray[i] = (Math.random() - 0.5) * 20;
+        particlesGeometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+        const materialParticles = new THREE.PointsMaterial({ size: 0.02, color: 0xffffff, transparent: true, opacity: 0.5 });
+        const particlesMesh = new THREE.Points(particlesGeometry, materialParticles);
+        scene.add(particlesMesh);
+
+        camera.position.z = 5;
+
+        function animate() {
+            requestAnimationFrame(animate);
+            spirit.rotation.x += 0.005; spirit.rotation.y += 0.005;
+            soul.rotation.x -= 0.003; soul.rotation.y -= 0.003;
+            heart.rotation.y += 0.002;
+            particlesMesh.rotation.y += 0.0005;
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // --- 2. INTERACTION DU TICKET (TILT) ---
+        const ticket = document.getElementById('ticket');
+        const wrapper = document.getElementById('scene-wrapper');
+
+        wrapper.addEventListener('mousemove', (e) => {
+            // Désactiver le tilt si on est dans le textarea
+            if (e.target.tagName === 'TEXTAREA') return;
+
+            const rect = wrapper.getBoundingClientRect();
+            const x = e.clientX - rect.left - rect.width / 2;
+            const y = e.clientY - rect.top - rect.height / 2;
+            const rotateY = (x / (rect.width / 2)) * 10; 
+            const rotateX = -(y / (rect.height / 2)) * 10;
+            ticket.style.transform = `rotateY(${rotateY}deg) rotateX(${rotateX}deg)`;
+        });
+
+        wrapper.addEventListener('mouseleave', () => {
+            ticket.style.transform = `rotateY(0deg) rotateX(0deg)`;
+        });
+
+        // --- 3. GEMINI API INTEGRATION ---
+        
+        async function consultOracle() {
+            const userInput = document.getElementById('user-input').value;
+            const outputDiv = document.getElementById('ai-response');
+            const btn = document.getElementById('consult-btn');
+            
+            if (!userInput.trim()) return;
+
+            // UI State: Loading
+            btn.innerHTML = 'ANALYSE EN COURS... <i class="fas fa-spinner fa-spin"></i>';
+            btn.disabled = true;
+            outputDiv.style.display = 'block';
+            outputDiv.textContent = '';
+            outputDiv.classList.add('typing-cursor');
+
+            const apiKey = ""; // Runtime provided
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+
+            const systemPrompt = `Tu es un expert sage en psychologie islamique (Tazkiyah).
+            Analyse la situation de l'utilisateur en utilisant UNIQUEMENT les concepts suivants :
+            1. Le Roi (Qalb/Cœur), le Cavalier (Ruh/Esprit), la Monture (Nafs/Égo).
+            2. Les états de l'âme : Ammara (Incitatrice), Lawwama (Blâmante), Mutma'inna (Apaisée).
+            
+            Ton format de réponse doit être strict et ressembler à un ticket de caisse :
+            --- DIAGNOSTIC ---
+            [Analyse brève de l'état du Roi et de la Monture]
+            --- PRESCRIPTION ---
+            [Un conseil pratique concret]
+            --- NOTE DU SAGE ---
+            [Une phrase courte de réconfort ou de sagesse]
+
+            Reste court, bienveillant mais direct. Pas de markdown gras, juste du texte brut.`;
+
+            const payload = {
+                contents: [{
+                    parts: [{ text: `Situation utilisateur : "${userInput}". ${systemPrompt}` }]
+                }]
+            };
+
+            try {
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                const aiText = data.candidates?.[0]?.content?.parts?.[0]?.text || "Erreur de connexion au Cœur. Réessayez.";
+                
+                // Simulate typing effect
+                outputDiv.textContent = "";
+                let i = 0;
+                const speed = 20; // ms per char
+                
+                function typeWriter() {
+                    if (i < aiText.length) {
+                        outputDiv.textContent += aiText.charAt(i);
+                        i++;
+                        setTimeout(typeWriter, speed);
+                    } else {
+                        outputDiv.classList.remove('typing-cursor');
+                        btn.innerHTML = 'IMPRIMER L\'ANALYSE <i class="fas fa-print"></i>';
+                        btn.disabled = false;
+                    }
+                }
+                typeWriter();
+
+            } catch (error) {
+                outputDiv.textContent = "Erreur : Le lien spirituel semble interrompu.";
+                btn.disabled = false;
+                btn.innerHTML = 'RÉESSAYER';
+            }
+        }
+    </script>
+</body>
+</html>
